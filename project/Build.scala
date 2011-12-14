@@ -2,7 +2,13 @@ import sbt._
 import Keys._
 
 object MyBuild extends Build {
-  val distPath = "/home/dcs/github/scala/dists" // Set this to your environment
+  // If only it didn't take me an hour to figure out how to log something
+  private def distsMessage() {
+    scala.Console.err.println("No distributions found: set SCALA_DISTS to a path containing scala distributions.")
+  }
+  
+  // Set this to path to dists
+  val distPath = sys.env.getOrElse("SCALA_DISTS", ".")
 
   override def projects = root +: benchProjects
 
@@ -16,13 +22,14 @@ object MyBuild extends Build {
     aggregate(benchProjects map Reference.projectToRef: _*)
   )
 
-  // Just add all projects you want benchmarked here
+  // Auto-find scala distributions in the dists dir
   lazy val benchProjects: Seq[Project] = (
-    normalAndOptimised("former")
-    ++ normalAndOptimised("paulp")
-    ++ normalAndOptimised("dcs5286")
-    ++ normalAndOptimised("dcsLast")
-    ++ normalAndOptimised("subrange")
+    file(distPath).listFiles.toList
+      filter  (_ / "lib/scala-library.jar" exists)
+      flatMap (f => normalAndOptimised(f.name)) match {
+        case Nil    => distsMessage() ; Nil
+        case xs     => xs
+      }
   )
 
   def normalAndOptimised(dir: String) = Seq(
